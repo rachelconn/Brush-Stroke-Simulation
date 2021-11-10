@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
+import simplify from 'simplify-js';
 import stream from 'stream';
 import exportExampleToSVG from './utils/exportExampleToSVG';
 
@@ -41,7 +42,6 @@ function processExample(example: RawDrawingExample): DrawingExample {
 
   // Determine axis that has a larger range, make x and y values range that much to preserve scale
   const range = Math.max(maxX - minX, maxY - minY);
-  console.log(minX, maxX, minY, maxY, range);
   maxX = minX + range;
   maxY = minY + range;
 
@@ -97,8 +97,7 @@ async function addExamplesToCache(datasetPath: string, examplesPerFile: number) 
   await Promise.all(fs.readdirSync(datasetPath).map(async (filename) => {
     const pathToFile = path.join(datasetPath, filename);
     console.log(`Reading from ${pathToFile}`);
-    cache.set(filename, await getExamplesFromFile(filename, examplesPerFile));
-    console.log(cache.get(filename));
+    cache.set(filename, await getExamplesFromFile(pathToFile, examplesPerFile));
   }));
 }
 
@@ -110,4 +109,24 @@ const createTestExamples = async () => {
   });
 };
 
-createTestExamples();
+// createTestExamples();
+
+// Create files with path data for each example file
+function createTrainingDataFile(filename: string) {
+  const trainingDataPath = path.join('training_data', `${path.basename(filename)}.csv`);
+  const fstream = fs.createWriteStream(trainingDataPath);
+  cache.get(filename).forEach((example) => {
+    example.strokes.forEach((stroke) => {
+      const originalStroke = stroke.flat().join(',');
+      const simplifiedStroke = simplify(stroke, 5, true).flat().join(',');
+      fstream.write(originalStroke);
+      fstream.write(simplifiedStroke);
+    });
+  });
+}
+
+addExamplesToCache(INPUT_DATA_PATH, 1000).then(() => {
+  cache.forEach((_, filename) => {
+    createTrainingDataFile(filename);
+  });
+});

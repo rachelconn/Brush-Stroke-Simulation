@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "canvas": "^2.8.0",
+    "jsdom": "^18.0.1",
     "paper-jsdom": "^0.12.12",
     "react": "^16.10.2",
     "react-dom": "^16.10.2",

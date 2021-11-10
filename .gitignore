@@ -3,4 +3,7 @@ node_modules/*
 !node_modules/simplify-js
 
 main.js*
+
+# Generated data
 examples/
+training_data/
