@@ -1,3 +1,6 @@
-node_modules
+# Node modules (except simplify js, which has a custom implementation for performance)
+node_modules/*
+!node_modules/simplify-js
+
 main.js*
 examples/

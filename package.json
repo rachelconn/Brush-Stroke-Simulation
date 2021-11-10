@@ -30,6 +30,7 @@
     "react": "^16.10.2",
     "react-dom": "^16.10.2",
     "react-redux": "7.1.1",
-    "redux": "4.0.4"
+    "redux": "4.0.4",
+    "simplify-js": "1.2.4"
   }
 }
