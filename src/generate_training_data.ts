@@ -86,21 +86,6 @@ async function getExamplesFromFile(filename: string, numExamples: number): Promi
   });
 }
 
-const cache = new Map<string, DrawingExample[]>();
-
-/**
- * Adds examplesPerFile examples from each file in the dataset to the cache.
- * @param datasetPath Path containing raw quick draw dataset files
- * @param examplesPerFile Number of examples per file to cache
- */
-async function addExamplesToCache(datasetPath: string, examplesPerFile: number) {
-  await Promise.all(fs.readdirSync(datasetPath).map(async (filename) => {
-    const pathToFile = path.join(datasetPath, filename);
-    console.log(`Reading from ${pathToFile}`);
-    cache.set(filename, await getExamplesFromFile(pathToFile, examplesPerFile));
-  }));
-}
-
 // Saves a few examples to the examples directory to test getting examples works
 const createTestExamples = async () => {
   const examples = await getExamplesFromFile(path.join(INPUT_DATA_PATH, 'truck.ndjson'), 10);
@@ -112,21 +97,29 @@ const createTestExamples = async () => {
 // createTestExamples();
 
 // Create files with path data for each example file
-function createTrainingDataFile(filename: string) {
+function createTrainingDataFile(filename: string, examples: DrawingExample[]) {
   const trainingDataPath = path.join('training_data', `${path.basename(filename)}.csv`);
   const fstream = fs.createWriteStream(trainingDataPath);
-  cache.get(filename).forEach((example) => {
+  examples.forEach((example) => {
     example.strokes.forEach((stroke) => {
       const originalStroke = stroke.flat().join(',');
       const simplifiedStroke = simplify(stroke, 5, true).flat().join(',');
-      fstream.write(originalStroke);
-      fstream.write(simplifiedStroke);
+      fstream.write(originalStroke + '\r\n');
+      fstream.write(simplifiedStroke + '\r\n');
     });
   });
 }
 
-addExamplesToCache(INPUT_DATA_PATH, 1000).then(() => {
-  cache.forEach((_, filename) => {
-    createTrainingDataFile(filename);
-  });
-});
+async function createTrainingDataFiles() {
+  const files = fs.readdirSync(INPUT_DATA_PATH);
+  for (let i = 0; i < files.length; i++) {
+    const filename = files[i];
+    console.log(`(${i + 1}/${files.length}) Generating training data from ${filename}...`)
+    const pathToFile = path.join(INPUT_DATA_PATH, filename);
+    await getExamplesFromFile(pathToFile, 1000).then((examples) => {
+      createTrainingDataFile(filename, examples);
+    });
+  }
+}
+
+createTrainingDataFiles();
