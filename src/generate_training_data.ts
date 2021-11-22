@@ -104,7 +104,7 @@ function createTrainingDataFile(filename: string, examples: DrawingExample[]) {
     example.strokes.forEach((stroke) => {
       const originalStroke = stroke.flat().join(',');
       const simplifiedStroke = simplify(stroke, 5, true).flat().join(',');
-      fstream.write(originalStroke + '\r\n');
+      fstream.write(originalStroke + ';');
       fstream.write(simplifiedStroke + '\r\n');
     });
   });
