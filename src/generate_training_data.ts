@@ -6,6 +6,8 @@ import stream from 'stream';
 import exportExampleToSVG from './utils/exportExampleToSVG';
 
 const INPUT_DATA_PATH = path.join('e:', 'quickdraw');
+const TOLERANCE = 5;
+const TRAINING_DATA_FOLDER = `training_data_${TOLERANCE}`;
 
 export interface RawDrawingExample {
   'key_id': number,
@@ -42,6 +44,7 @@ function processExample(example: RawDrawingExample): DrawingExample {
 
   // Determine axis that has a larger range, make x and y values range that much to preserve scale
   const range = Math.max(maxX - minX, maxY - minY);
+  console.log(range);
   maxX = minX + range;
   maxY = minY + range;
 
@@ -54,6 +57,24 @@ function processExample(example: RawDrawingExample): DrawingExample {
       points.push([x, y]);
     }
     return points;
+  });
+
+  return { strokes };
+}
+
+function processToStrokes(example: RawDrawingExample): DrawingExample {
+  const strokes = example.drawing.map(([xs, ys]) => {
+    let minX = Infinity;
+    let minY = Infinity;
+    for (let i = 0; i < xs.length; i++) {
+      if (xs[i] < minX) minX = xs[i];
+      if (ys[i] < minY) minY = ys[i];
+    }
+    const stroke: StrokeData = [];
+    for (let i = 0; i < xs.length; i++) {
+      stroke.push([xs[i] - minX, ys[i] - minY]);
+    }
+    return stroke;
   });
 
   return { strokes };
@@ -75,7 +96,7 @@ async function getExamplesFromFile(filename: string, numExamples: number): Promi
   // Read lines and put into examples
   return new Promise((resolve) => {
     rl.on('line', (line) => {
-      examples.push(processExample(JSON.parse(line) as RawDrawingExample));
+      examples.push(processToStrokes(JSON.parse(line) as RawDrawingExample));
 
       remainingExamples -= 1;
       if (remainingExamples == 0) {
@@ -98,12 +119,12 @@ const createTestExamples = async () => {
 
 // Create files with path data for each example file
 function createTrainingDataFile(filename: string, examples: DrawingExample[]) {
-  const trainingDataPath = path.join('training_data', `${path.basename(filename)}.csv`);
+  const trainingDataPath = path.join(TRAINING_DATA_FOLDER, `${path.basename(filename)}.csv`);
   const fstream = fs.createWriteStream(trainingDataPath);
   examples.forEach((example) => {
     example.strokes.forEach((stroke) => {
       const originalStroke = stroke.flat().join(',');
-      const simplifiedStroke = simplify(stroke, 5, true).flat().join(',');
+      const simplifiedStroke = simplify(stroke, TOLERANCE, true).flat().join(',');
       fstream.write(originalStroke + ';');
       fstream.write(simplifiedStroke + '\r\n');
     });
@@ -112,6 +133,11 @@ function createTrainingDataFile(filename: string, examples: DrawingExample[]) {
 
 async function createTrainingDataFiles() {
   const files = fs.readdirSync(INPUT_DATA_PATH);
+  // Create training data folder if it doesn't exist
+  if (!fs.existsSync(TRAINING_DATA_FOLDER)) {
+    fs.mkdirSync(TRAINING_DATA_FOLDER);
+  }
+
   for (let i = 0; i < files.length; i++) {
     const filename = files[i];
     console.log(`(${i + 1}/${files.length}) Generating training data from ${filename}...`)
