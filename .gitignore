@@ -6,7 +6,7 @@ main.js*
 
 # Generated data
 examples/
-training_data/
+training_data*/
 
 # Compiled python files
 *.pyc
