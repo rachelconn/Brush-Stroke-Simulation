@@ -5,7 +5,7 @@ import tensorflow as tf
 MAX_SEQ_LENGTH = 300
 
 def _csv_to_array(text):
-    return tf.reshape(tf.strings.to_number(tf.strings.split(text, ',')), (-1, 2))
+    return tf.RaggedTensor.from_tensor(tf.reshape(tf.strings.to_number(tf.strings.split(text, ',')), (-1, 2)))
 
 def _process_entry(line):
     """
