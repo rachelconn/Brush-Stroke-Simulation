@@ -1,3 +1,5 @@
+import nvidia_smi
+import gc
 import os
 import torch
 from torch import nn
@@ -10,44 +12,52 @@ class TransformerGAN:
 
         self.checkpoint_path = os.path.join('trained', self.model_params.name, 'model.ckpt')
 
-        self.generator = Transformer(2, 2).to('cuda')
+        self.generator = Transformer(2, 64, 2).to('cuda')
+        self.load()
 
         self.loss = nn.MSELoss()
         self.optimizer = torch.optim.Adam(
             self.generator.parameters(),
-            lr=self.model_params.lr,
+            lr=self.training_params.lr,
         )
 
-    def train(self, dataset, batch_size=128, num_examples=100_000):
-        print_every = 1_000
-        save_every = 10_000
+    def train(self, dataset, num_batches=3_000):
+        print_every = 300
+        save_every = 300
         total_loss = 0
 
         print('Beginning training...')
-        dataset = dataset.shuffle(buffer_size=10_000)
+        dataset = dataset.shuffle(buffer_size=100).batch(self.training_params.batch_size).repeat()
         # TODO: use src_key_padding_mask to allow batch sizes > 1
-        for i, sample in enumerate(dataset, 1):
-            x, y = sample
-            x = torch.unsqueeze(torch.from_numpy(x.numpy()), 1).to('cuda')
-            y = torch.unsqueeze(torch.from_numpy(y.numpy()), 1).to('cuda')
+        for batch_num, batch in enumerate(dataset, 1):
+            x, y = batch
+            x /= 255
+            y /= 255
+            loss = 0
+            for sample in range(self.training_params.batch_size):
+                sample_x = torch.unsqueeze(torch.from_numpy(x[sample].numpy()), 1).to('cuda')
+                sample_y = torch.unsqueeze(torch.from_numpy(y[sample].numpy()), 1).to('cuda')
 
-            pred = self.generator(x, y)
-            loss = self.loss(pred, y)
+                sample_pred = self.generator(sample_x, sample_y)
+                loss += self.loss(sample_pred, sample_y)
+
+            loss /= self.training_params.batch_size
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
             total_loss += loss
-            if i % print_every == 0:
-                print(y)
-                print(pred)
-                print(f'Finished sample {i}.\n  Average loss: {total_loss / print_every}')
+            if batch_num % print_every == 0:
+                print(x[-1])
+                print(y[-1])
+                print(sample_pred)
+                print(f'Finished batch {batch_num}.\n  Average loss: {total_loss / print_every}')
                 total_loss = 0
 
-            if i % save_every == 0:
+            if batch_num % save_every == 0:
                 self.save()
 
-            if i == num_examples:
+            if batch_num == num_batches:
                 return
 
     def save(self):
@@ -56,6 +66,11 @@ class TransformerGAN:
         print(f'Model saved to {self.checkpoint_path}.')
 
     def load(self):
-        ckpt = torch.load(self.checkpoint_path, map_location="cpu")
-        self.generator.load_state_dict(ckpt, strict=True)
-        print(f'Loaded parameters from {self.checkpoint_path}.')
+        try:
+            ckpt = torch.load(self.checkpoint_path, map_location="cpu")
+            self.generator.load_state_dict(ckpt, strict=True)
+            print(f'Loaded parameters from {self.checkpoint_path}.')
+        except:
+            print(f'No saved model found in {self.checkpoint_path}, creating new model.')
+        finally:
+            return
